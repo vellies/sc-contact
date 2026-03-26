@@ -7,7 +7,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 10000,
+  timeout: 120000, // 2 min for education API (Google Places takes time)
 });
 
 // Request interceptor
@@ -28,6 +28,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Auto-logout on 401 (expired/invalid token)
+    if (error.response?.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      }
+    }
     const message = error.response?.data?.message || "Something went wrong";
     console.error("API Error:", message);
     return Promise.reject(error);

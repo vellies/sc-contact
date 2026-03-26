@@ -2,7 +2,7 @@ export default function HomePage() {
   return (
     <section className="flex flex-col items-center justify-center min-h-[80vh] px-4">
       <h1 className="text-4xl md:text-6xl font-bold text-center mb-6">
-        Welcome to <span className="text-blue-600">SC Contact</span>
+        Welcome to <span className="text-blue-600">Education</span>
       </h1>
       <p className="text-lg md:text-xl text-gray-600 text-center max-w-2xl mb-8">
         A full-stack contact management application built with Next.js,

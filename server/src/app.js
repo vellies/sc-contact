@@ -6,6 +6,9 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 
 const contactRoutes = require("./routes/contactRoutes");
+const authRoutes = require("./routes/authRoutes");
+const locationRoutes = require("./routes/locationRoutes");
+const educationRoutes = require("./routes/educationRoutes");
 const { errorHandler, notFound } = require("./middlewares/errorHandler");
 
 const app = express();
@@ -25,7 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 200,
   message: { success: false, message: "Too many requests, please try again later." },
 });
 app.use("/api", limiter);
@@ -35,7 +38,10 @@ app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "Server is running", timestamp: new Date().toISOString() });
 });
 
+app.use("/api/auth", authRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/locations", locationRoutes);
+app.use("/api/education", educationRoutes);
 
 // --------------- Error Handling ---------------
 app.use(notFound);
