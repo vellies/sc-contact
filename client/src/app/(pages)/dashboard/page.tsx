@@ -37,12 +37,6 @@ export default function DashboardPage() {
       <section className="max-w-6xl mx-auto px-4 py-16">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <a
-            href="/contact"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            + Add Contact
-          </a>
         </div>
 
         {contacts.length === 0 ? (

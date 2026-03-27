@@ -29,6 +29,7 @@ router.post("/search-by-district", searchByDistrict);
 router.post("/save", validateSaveInstitutions, saveInstitutions);
 
 // --- Get from DB ---
+router.get("/all", getAllInstitutions);
 router.get("/area/:areaId", getByArea);
 router.get("/district/:districtId", getByDistrict);
 router.get("/district/:districtId/summary", getDistrictSummary);

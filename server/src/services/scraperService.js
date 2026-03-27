@@ -113,12 +113,69 @@ function extractContacts(html) {
 
   // Phone icon selectors
   const phoneIconSelectors = [
-    "i.fa-phone", "i.fa-phone-square", "i.fa-phone-alt",
-    "i.fa-mobile", "i.fa-mobile-alt",
-    "i.bi-telephone", "i.bi-telephone-fill", "i.bi-phone",
+    // Generic class names
+    ".phone", ".telephone", ".mobile", ".call", ".contact-phone",
+    ".phone-number", ".tel-number", ".mobile-number", ".contact-number",
+    ".phone-link", ".call-link", ".phone-info", ".phone-text",
+
+    // Font Awesome 4.x
+    "i.fa-phone", "i.fa-phone-square", "i.fa-mobile", "i.fa-mobile-phone",
+
+    // Font Awesome 5.x / 6.x
+    "i.fas.fa-phone", "i.fas.fa-phone-alt", "i.fas.fa-phone-square",
+    "i.fas.fa-phone-square-alt", "i.fas.fa-phone-volume",
+    "i.fas.fa-mobile", "i.fas.fa-mobile-alt",
+    "i.far.fa-phone", "i.fal.fa-phone",
+    "svg.fa-phone", "svg.fa-mobile",
+
+    // Bootstrap Icons
+    "i.bi-telephone", "i.bi-telephone-fill", "i.bi-telephone-forward",
+    "i.bi-telephone-inbound", "i.bi-telephone-outbound",
+    "i.bi-phone", "i.bi-phone-fill", "i.bi-phone-vibrate",
+
+    // Material Icons
+    ".material-icons[data-icon='phone']", ".material-icons[data-icon='call']",
+    ".material-icons[data-icon='phone_android']",
+    ".material-icons[data-icon='phone_iphone']",
+    ".material-icons[data-icon='smartphone']",
+
+    // Ionicons
+    "ion-icon[name='call']", "ion-icon[name='call-outline']",
+    "ion-icon[name='phone-portrait']", "ion-icon[name='phone-portrait-outline']",
+
+    // Feather Icons
+    "[data-feather='phone']", "[data-feather='phone-call']",
+    "[data-feather='smartphone']", ".feather-phone",
+
+    // Tabler Icons
+    "i.ti-phone", "i.ti-phone-call", "i.ti-device-mobile",
+
+    // Remix Icons
+    "i.ri-phone-line", "i.ri-phone-fill",
+    "i.ri-smartphone-line", "i.ri-smartphone-fill",
+    "i.ri-cellphone-line", "i.ri-cellphone-fill",
+
+    // Lineicons / Themify / Simple Line
+    "i.lni-phone", "i.lni-mobile", "i.icon-phone", "i.icon-call-end",
+
+    // Wildcard
     "[class*='fa-phone']", "[class*='bi-telephone']", "[class*='bi-phone']",
     "[class*='icon-phone']", "[class*='icon-call']",
     "[class*='phone-icon']", "[class*='call-icon']",
+    "[class*='ico-phone']", "[class*='ico-call']",
+
+    // SVG / img
+    "img[alt*='phone' i]", "img[alt*='call' i]", "img[src*='phone']",
+    "svg[aria-label*='phone' i]", "svg[aria-label*='call' i]",
+
+    // Aria / data
+    "[aria-label*='phone' i]", "[aria-label*='call' i]",
+    "[title*='phone' i]", "[title*='call' i]",
+    "[data-icon*='phone']", "[data-icon*='call']",
+    "[data-type='phone']", "[data-type='tel']",
+
+    // tel links
+    "a[href^='tel:']",
   ];
 
   $(phoneIconSelectors.join(", ")).each((_, el) => {
@@ -142,11 +199,86 @@ function extractContacts(html) {
 
   // Email icon selectors
   const emailIconSelectors = [
+    // Generic class names
     ".email", ".mail", ".e-mail", ".email-id", ".contact-email",
+    ".email-address", ".mail-address", ".email-link", ".mail-link",
+    ".email-contact", ".contact-mail", ".user-email", ".member-email",
+    ".profile-email", ".team-email", ".business-email", ".work-email",
+    ".email-info", ".info-email", ".email-text", ".email-label",
+    ".email-wrapper", ".email-container", ".email-field", ".email-value",
+
+    // Font Awesome 4.x
     "i.fa-envelope", "i.fa-envelope-o", "i.fa-at",
-    "i.bi-envelope", "i.bi-envelope-fill",
+    "i.fa-inbox", "i.fa-send", "i.fa-paper-plane", "i.fa-paper-plane-o",
+
+    // Font Awesome 5.x / 6.x
+    "i.fas.fa-envelope", "i.far.fa-envelope", "i.fal.fa-envelope",
+    "i.fad.fa-envelope", "i.fab.fa-envelope",
+    "i.fas.fa-envelope-open", "i.far.fa-envelope-open",
+    "i.fas.fa-envelope-square", "i.fas.fa-at",
+    "i.fas.fa-paper-plane", "i.far.fa-paper-plane",
+    "i.fas.fa-inbox", "i.fas.fa-mailbox",
+    "svg.fa-envelope", "svg.fa-at",
+
+    // Bootstrap Icons
+    "i.bi-envelope", "i.bi-envelope-fill", "i.bi-envelope-open",
+    "i.bi-envelope-open-fill", "i.bi-envelope-check", "i.bi-envelope-check-fill",
+    "i.bi-envelope-dash", "i.bi-envelope-dash-fill",
+    "i.bi-envelope-exclamation", "i.bi-envelope-x", "i.bi-envelope-x-fill",
+    "i.bi-at", "i.bi-mailbox", "i.bi-mailbox2",
+    "i.bi-send", "i.bi-send-fill",
+
+    // Material Icons
+    ".material-icons[data-icon='email']", ".material-icons[data-icon='mail']",
+    ".material-icons[data-icon='mail_outline']",
+    ".material-icons[data-icon='contact_mail']",
+    ".material-icons[data-icon='forward_to_inbox']",
+    "span.material-symbols-outlined",
+
+    // Ionicons
+    "ion-icon[name='mail']", "ion-icon[name='mail-outline']",
+    "ion-icon[name='mail-open']", "ion-icon[name='mail-open-outline']",
+    "ion-icon[name='send']", "ion-icon[name='at']",
+
+    // Feather Icons
+    "[data-feather='mail']", "[data-feather='send']", "[data-feather='at-sign']",
+    ".feather-mail", ".feather-send",
+
+    // Tabler Icons
+    "i.ti-mail", "i.ti-mailbox", "i.ti-send", "i.ti-at",
+
+    // Remix Icons
+    "i.ri-mail-line", "i.ri-mail-fill",
+    "i.ri-mail-open-line", "i.ri-mail-open-fill",
+    "i.ri-mail-send-line", "i.ri-mail-send-fill",
+    "i.ri-at-line", "i.ri-at-fill",
+    "i.ri-send-plane-line", "i.ri-send-plane-fill",
+    "i.ri-inbox-line", "i.ri-inbox-fill",
+
+    // Lineicons / Themify / Simple Line
+    "i.lni-envelope", "i.lni-email", "i.lni-inbox",
+    "i.ti-email", "i.icon-envelope", "i.icon-envelope-open",
+
+    // Wildcard
     "[class*='fa-envelope']", "[class*='bi-envelope']",
     "[class*='icon-mail']", "[class*='icon-email']",
+    "[class*='email-icon']", "[class*='mail-icon']",
+    "[class*='ico-mail']", "[class*='ico-email']",
+    "[class*='envelope']",
+
+    // SVG / img
+    "img[alt*='email' i]", "img[alt*='mail' i]",
+    "img[src*='email']", "img[src*='mail']", "img[src*='envelope']",
+    "svg[aria-label*='email' i]", "svg[aria-label*='mail' i]",
+
+    // Aria / data
+    "[aria-label*='email' i]", "[aria-label*='mail' i]",
+    "[title*='email' i]", "[title*='mail' i]",
+    "[data-icon*='email']", "[data-icon*='mail']", "[data-icon*='envelope']",
+    "[data-type='email']",
+
+    // mailto fallback
+    "a[href^='mailto:']",
   ];
 
   $(emailIconSelectors.join(", ")).each((_, el) => {

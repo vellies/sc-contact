@@ -155,10 +155,14 @@ exports.getAllInstitutions = async (req, res, next) => {
       area,
       sort = "name",
       order = "asc",
+      hasPhone,
+      hasEmail,
+      hasContact,
+      hasWebsite,
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const limitNum = Math.min(1000, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
     // Build query
@@ -167,6 +171,16 @@ exports.getAllInstitutions = async (req, res, next) => {
     if (district) query.district = district;
     if (area) query.area = area;
     if (type) query.types = type;
+
+    // "Has data" / "No data" checkbox filters
+    if (hasPhone === "true") query.phones = { $exists: true, $ne: [] };
+    if (hasPhone === "false") query.$and = [...(query.$and || []), { $or: [{ phones: { $exists: false } }, { phones: [] }] }];
+    if (hasEmail === "true") query.emails = { $exists: true, $ne: [] };
+    if (hasEmail === "false") query.$and = [...(query.$and || []), { $or: [{ emails: { $exists: false } }, { emails: [] }] }];
+    if (hasContact === "true") query.contacts = { $exists: true, $ne: [] };
+    if (hasContact === "false") query.$and = [...(query.$and || []), { $or: [{ contacts: { $exists: false } }, { contacts: [] }] }];
+    if (hasWebsite === "true") query.website = { $exists: true, $ne: "" };
+    if (hasWebsite === "false") query.$and = [...(query.$and || []), { $or: [{ website: { $exists: false } }, { website: "" }] }];
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },

@@ -44,7 +44,50 @@ export interface DistrictSummaryItem {
   city: string;
 }
 
+export interface PaginatedResult {
+  count: number;
+  totalCount: number;
+  page: number;
+  totalPages: number;
+  limit: number;
+  data: SavedInstitution[];
+}
+
 export const educationService = {
+  // ========== GET ALL (Paginated) ==========
+  async getAll(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    type?: string;
+    state?: string;
+    district?: string;
+    area?: string;
+    sort?: string;
+    order?: string;
+    hasPhone?: boolean;
+    hasEmail?: boolean;
+    hasContact?: boolean;
+    hasWebsite?: boolean;
+  } = {}): Promise<PaginatedResult> {
+    const query: Record<string, string> = {};
+    if (params.page) query.page = String(params.page);
+    if (params.limit) query.limit = String(params.limit);
+    if (params.search) query.search = params.search;
+    if (params.type) query.type = params.type;
+    if (params.state) query.state = params.state;
+    if (params.district) query.district = params.district;
+    if (params.area) query.area = params.area;
+    if (params.sort) query.sort = params.sort;
+    if (params.order) query.order = params.order;
+    if (params.hasPhone !== undefined) query.hasPhone = String(params.hasPhone);
+    if (params.hasEmail !== undefined) query.hasEmail = String(params.hasEmail);
+    if (params.hasContact !== undefined) query.hasContact = String(params.hasContact);
+    if (params.hasWebsite !== undefined) query.hasWebsite = String(params.hasWebsite);
+    const { data } = await api.get("/education/all", { params: query });
+    return data;
+  },
+
   // ========== SEARCH (Google Places) ==========
   async search(params: {
     pincode: string;

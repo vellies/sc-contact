@@ -6,12 +6,10 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const navLinks = [
-  { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/locations", label: "Locations" },
   { href: "/education", label: "Education" },
-  { href: "/contact", label: "Contact" },
-  { href: "/about", label: "About" },
+  { href: "/institutions", label: "Institutions" },
 ];
 
 export default function Navbar() {
@@ -31,7 +29,7 @@ export default function Navbar() {
                 href={link.href}
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-blue-600",
-                  pathname === link.href ? "text-blue-600" : "text-gray-600"
+                  pathname === link.href || (link.href === "/dashboard" && pathname === "/") ? "text-blue-600" : "text-gray-600"
                 )}
               >
                 {link.label}
