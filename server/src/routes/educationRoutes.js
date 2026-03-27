@@ -14,6 +14,7 @@ const {
   scrapeInstitution,
   scrapeByArea,
   getAllInstitutions,
+  getDashboardStats,
 } = require("../controllers/educationController");
 const {
   validateSaveInstitutions,
@@ -27,6 +28,9 @@ router.post("/search-by-district", searchByDistrict);
 
 // --- Save to DB (with zod validation) ---
 router.post("/save", validateSaveInstitutions, saveInstitutions);
+
+// --- Dashboard ---
+router.get("/dashboard", getDashboardStats);
 
 // --- Get from DB ---
 router.get("/all", getAllInstitutions);

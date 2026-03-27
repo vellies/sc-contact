@@ -1,7 +1,126 @@
 const { findEducationInstitutions } = require("../services/educationService");
 const { scrapeWebsite } = require("../services/scraperService");
 const Area = require("../models/Area");
+const District = require("../models/District");
+const State = require("../models/State");
 const Institution = require("../models/Institution");
+
+// @desc    Dashboard stats
+// @route   GET /api/education/dashboard
+exports.getDashboardStats = async (req, res, next) => {
+  try {
+    // Total counts
+    const [totalInstitutions, totalStates, totalDistricts, totalAreas] =
+      await Promise.all([
+        Institution.countDocuments(),
+        State.countDocuments(),
+        District.countDocuments(),
+        Area.countDocuments(),
+      ]);
+
+    // Count by type
+    const typeStats = await Institution.aggregate([
+      { $unwind: "$types" },
+      { $group: { _id: "$types", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Data coverage: has phone / email / contact / website
+    const [withPhone, withEmail, withContact, withWebsite] = await Promise.all([
+      Institution.countDocuments({ phones: { $exists: true, $ne: [] } }),
+      Institution.countDocuments({ emails: { $exists: true, $ne: [] } }),
+      Institution.countDocuments({ contacts: { $exists: true, $ne: [] } }),
+      Institution.countDocuments({ website: { $exists: true, $ne: "" } }),
+    ]);
+
+    // Top 10 states by institution count
+    const topStates = await Institution.aggregate([
+      { $group: { _id: "$state", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: "states",
+          localField: "_id",
+          foreignField: "_id",
+          as: "stateInfo",
+        },
+      },
+      { $unwind: "$stateInfo" },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          name: "$stateInfo.name",
+        },
+      },
+    ]);
+
+    // Top 10 districts by institution count
+    const topDistricts = await Institution.aggregate([
+      { $group: { _id: "$district", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: "districts",
+          localField: "_id",
+          foreignField: "_id",
+          as: "districtInfo",
+        },
+      },
+      { $unwind: "$districtInfo" },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          name: "$districtInfo.name",
+        },
+      },
+    ]);
+
+    // Recent 7 days activity (institutions added per day)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentActivity = await Institution.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        totals: {
+          institutions: totalInstitutions,
+          states: totalStates,
+          districts: totalDistricts,
+          areas: totalAreas,
+        },
+        typeStats,
+        coverage: {
+          withPhone,
+          withEmail,
+          withContact,
+          withWebsite,
+          total: totalInstitutions,
+        },
+        topStates,
+        topDistricts,
+        recentActivity,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // @desc    Search education institutions by pincode/area/city
 // @route   POST /api/education/search
