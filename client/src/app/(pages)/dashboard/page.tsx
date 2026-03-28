@@ -1,72 +1,100 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { locationService } from "@/services/locationService";
 import api from "@/lib/axios";
+import type { StateType, DistrictType, AreaType } from "@/types";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  LineChart,
-  Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
 
 interface DashboardData {
-  totals: {
-    institutions: number;
-    states: number;
-    districts: number;
-    areas: number;
-  };
+  totals: { institutions: number; states: number; districts: number; areas: number };
   typeStats: { _id: string; count: number }[];
-  coverage: {
-    withPhone: number;
-    withEmail: number;
-    withContact: number;
-    withWebsite: number;
-    total: number;
-  };
+  coverage: { withPhone: number; withEmail: number; withContact: number; withWebsite: number; total: number };
   topStates: { _id: string; name: string; count: number }[];
   topDistricts: { _id: string; name: string; count: number }[];
+  topAreas: { _id: string; name: string; pincode: string; count: number }[];
   recentActivity: { _id: string; count: number }[];
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  school: "#3b82f6",
-  college: "#8b5cf6",
-  polytechnic: "#f97316",
-  iti: "#eab308",
+  school: "#3b82f6", college: "#8b5cf6", polytechnic: "#f97316", iti: "#eab308",
 };
-
-const COVERAGE_COLORS = ["#10b981", "#e5e7eb"];
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Filters
+  const [states, setStates] = useState<StateType[]>([]);
+  const [districts, setDistricts] = useState<DistrictType[]>([]);
+  const [areas, setAreas] = useState<AreaType[]>([]);
+  const [filterState, setFilterState] = useState("");
+  const [filterDistrict, setFilterDistrict] = useState("");
+  const [filterArea, setFilterArea] = useState("");
+
+  // Load dashboard data
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = {};
+      if (filterState) params.state = filterState;
+      if (filterDistrict) params.district = filterDistrict;
+      if (filterArea) params.area = filterArea;
+      const res = await api.get("/education/dashboard", { params });
+      setData(res.data.data);
+    } catch {
+      console.error("Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
+  }, [filterState, filterDistrict, filterArea]);
+
+  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  // Load states
+  const loadStates = useCallback(async () => {
+    if (states.length > 0) return;
+    try { setStates(await locationService.getStates()); } catch { /* */ }
+  }, [states.length]);
+
+  // Load districts when state changes
   useEffect(() => {
+    setFilterDistrict("");
+    setFilterArea("");
+    setDistricts([]);
+    setAreas([]);
+    if (!filterState) return;
     const load = async () => {
-      try {
-        const res = await api.get("/education/dashboard");
-        setData(res.data.data);
-      } catch {
-        console.error("Failed to load dashboard");
-      } finally {
-        setLoading(false);
-      }
+      try { setDistricts(await locationService.getDistricts(filterState)); } catch { /* */ }
     };
     load();
-  }, []);
+  }, [filterState]);
 
-  if (loading) {
+  // Load areas when district changes
+  useEffect(() => {
+    setFilterArea("");
+    setAreas([]);
+    if (!filterDistrict) return;
+    const load = async () => {
+      try { setAreas(await locationService.getAreas(filterDistrict)); } catch { /* */ }
+    };
+    load();
+  }, [filterDistrict]);
+
+  const hasFilter = !!(filterState || filterDistrict || filterArea);
+  const filterLabel = filterArea
+    ? areas.find((a) => a._id === filterArea)?.area || "Area"
+    : filterDistrict
+    ? districts.find((d) => d._id === filterDistrict)?.name || "District"
+    : filterState
+    ? states.find((s) => s._id === filterState)?.name || "State"
+    : "All India";
+
+  if (!data && loading) {
     return (
       <ProtectedRoute>
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -76,17 +104,9 @@ export default function DashboardPage() {
     );
   }
 
-  if (!data) {
-    return (
-      <ProtectedRoute>
-        <div className="text-center py-16 text-gray-500">Failed to load dashboard data.</div>
-      </ProtectedRoute>
-    );
-  }
+  const d = data!;
+  const { totals, typeStats, coverage, topStates, topDistricts, topAreas, recentActivity } = d;
 
-  const { totals, typeStats, coverage, topStates, topDistricts, recentActivity } = data;
-
-  // Coverage data for pie charts
   const coverageItems = [
     { label: "Phone", value: coverage.withPhone, color: "#3b82f6" },
     { label: "Email", value: coverage.withEmail, color: "#8b5cf6" },
@@ -94,15 +114,14 @@ export default function DashboardPage() {
     { label: "Website", value: coverage.withWebsite, color: "#f97316" },
   ];
 
-  // Fill missing days in recent activity
   const activityMap = new Map(recentActivity.map((r) => [r._id, r.count]));
   const filledActivity = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split("T")[0];
+    const dt = new Date();
+    dt.setDate(dt.getDate() - i);
+    const key = dt.toISOString().split("T")[0];
     filledActivity.push({
-      date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       count: activityMap.get(key) || 0,
     });
   }
@@ -110,31 +129,81 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <section className="max-w-[1400px] mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+        {/* Header + Filters */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            {hasFilter && (
+              <p className="text-sm text-gray-500 mt-1">
+                Showing data for <span className="font-semibold text-blue-600">{filterLabel}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              value={filterState}
+              onFocus={loadStates}
+              onChange={(e) => setFilterState(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            >
+              <option value="">All States</option>
+              {states.map((s) => (<option key={s._id} value={s._id}>{s.name}</option>))}
+            </select>
+            <select
+              value={filterDistrict}
+              onChange={(e) => setFilterDistrict(e.target.value)}
+              disabled={!filterState}
+              className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
+            >
+              <option value="">All Districts</option>
+              {districts.map((d) => (<option key={d._id} value={d._id}>{d.name}</option>))}
+            </select>
+            <select
+              value={filterArea}
+              onChange={(e) => setFilterArea(e.target.value)}
+              disabled={!filterDistrict}
+              className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
+            >
+              <option value="">All Areas</option>
+              {areas.map((a) => (<option key={a._id} value={a._id}>{a.pincode} - {a.area}</option>))}
+            </select>
+            {hasFilter && (
+              <button
+                onClick={() => { setFilterState(""); setFilterDistrict(""); setFilterArea(""); }}
+                className="px-3 py-2 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Loading overlay */}
+        {loading && (
+          <div className="flex items-center gap-2 mb-4 text-sm text-gray-500">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            Updating...
+          </div>
+        )}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Institutions", value: totals.institutions, color: "blue", icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" },
-            { label: "States", value: totals.states, color: "green", icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" },
-            { label: "Districts", value: totals.districts, color: "purple", icon: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" },
-            { label: "Areas", value: totals.areas, color: "orange", icon: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" },
+            { label: "Institutions", value: totals.institutions, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "States", value: totals.states, color: "text-green-600", bg: "bg-green-50" },
+            { label: "Districts", value: totals.districts, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "Areas", value: totals.areas, color: "text-orange-600", bg: "bg-orange-50" },
           ].map((card) => (
             <div key={card.label} className="bg-white border rounded-xl p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-500">{card.label}</span>
-                <svg className={`w-5 h-5 text-${card.color}-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={card.icon} />
-                </svg>
-              </div>
-              <p className="text-3xl font-bold">{card.value.toLocaleString()}</p>
+              <span className="text-sm font-medium text-gray-500">{card.label}</span>
+              <p className={`text-3xl font-bold mt-1 ${card.color}`}>{card.value.toLocaleString()}</p>
             </div>
           ))}
         </div>
 
         {/* Row: Type Distribution + Data Coverage */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Type Distribution - Pie */}
+          {/* Type Distribution */}
           <div className="bg-white border rounded-xl p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-700 mb-4">Institution Types</h2>
             {typeStats.length === 0 ? (
@@ -144,17 +213,11 @@ export default function DashboardPage() {
                 <PieChart>
                   <Pie
                     data={typeStats.map((t) => ({ name: t._id, value: t.count }))}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={3}
-                    dataKey="value"
+                    cx="50%" cy="50%" innerRadius={60} outerRadius={100}
+                    paddingAngle={3} dataKey="value"
                     label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                   >
-                    {typeStats.map((t) => (
-                      <Cell key={t._id} fill={TYPE_COLORS[t._id] || "#94a3b8"} />
-                    ))}
+                    {typeStats.map((t) => (<Cell key={t._id} fill={TYPE_COLORS[t._id] || "#94a3b8"} />))}
                   </Pie>
                   <Tooltip />
                   <Legend />
@@ -174,17 +237,9 @@ export default function DashboardPage() {
                     <ResponsiveContainer width="100%" height={100}>
                       <PieChart>
                         <Pie
-                          data={[
-                            { value: item.value },
-                            { value: coverage.total - item.value },
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={30}
-                          outerRadius={42}
-                          startAngle={90}
-                          endAngle={-270}
-                          dataKey="value"
+                          data={[{ value: item.value }, { value: coverage.total - item.value }]}
+                          cx="50%" cy="50%" innerRadius={30} outerRadius={42}
+                          startAngle={90} endAngle={-270} dataKey="value"
                         >
                           <Cell fill={item.color} />
                           <Cell fill="#e5e7eb" />
@@ -202,7 +257,6 @@ export default function DashboardPage() {
 
         {/* Row: Top States + Top Districts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Top States */}
           <div className="bg-white border rounded-xl p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-700 mb-4">Top States</h2>
             {topStates.length === 0 ? (
@@ -220,7 +274,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Top Districts */}
           <div className="bg-white border rounded-xl p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-700 mb-4">Top Districts</h2>
             {topDistricts.length === 0 ? (
@@ -239,6 +292,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Top Areas */}
+        <div className="bg-white border rounded-xl p-5 shadow-sm mb-8">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Top Areas</h2>
+          {topAreas.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">No data</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={topAreas.map((a) => ({ name: `${a.name} (${a.pincode})`, count: a.count }))} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#f97316" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
         {/* Recent Activity */}
         <div className="bg-white border rounded-xl p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Institutions Added (Last 7 Days)</h2>
@@ -248,14 +319,8 @@ export default function DashboardPage() {
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="count"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ fill: "#3b82f6", r: 4 }}
-                activeDot={{ r: 6 }}
-              />
+              <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2}
+                dot={{ fill: "#3b82f6", r: 4 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

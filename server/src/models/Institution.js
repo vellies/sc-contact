@@ -65,4 +65,29 @@ institutionSchema.index({ district: 1 });
 institutionSchema.index({ state: 1 });
 institutionSchema.index({ types: 1 });
 
+// ─── Auto-sync to MailerLiteContact on save/update/delete ───────────
+const syncToMailerLite = async function (doc) {
+  try {
+    const { syncInstitution } = require("../services/mailerLiteCleanerService");
+    await syncInstitution(doc._id);
+  } catch (err) {
+    console.error("MailerLite auto-sync error:", err.message);
+  }
+};
+
+institutionSchema.post("save", syncToMailerLite);
+institutionSchema.post("findOneAndUpdate", async function (doc) {
+  if (doc) await syncToMailerLite(doc);
+});
+institutionSchema.post("findOneAndDelete", async function (doc) {
+  if (doc) {
+    try {
+      const { removeInstitutionContacts } = require("../services/mailerLiteCleanerService");
+      await removeInstitutionContacts(doc._id);
+    } catch (err) {
+      console.error("MailerLite auto-remove error:", err.message);
+    }
+  }
+});
+
 module.exports = mongoose.model("Institution", institutionSchema);

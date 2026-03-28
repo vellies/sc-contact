@@ -9,17 +9,32 @@ const Institution = require("../models/Institution");
 // @route   GET /api/education/dashboard
 exports.getDashboardStats = async (req, res, next) => {
   try {
-    // Total counts
+    const mongoose = require("mongoose");
+    const { state, district, area } = req.query;
+
+    // Build institution filter — convert string IDs to ObjectId for aggregation
+    const instFilter = {};
+    if (state) instFilter.state = new mongoose.Types.ObjectId(state);
+    if (district) instFilter.district = new mongoose.Types.ObjectId(district);
+    if (area) instFilter.area = new mongoose.Types.ObjectId(area);
+    const hasFilter = Object.keys(instFilter).length > 0;
+
+    // Total counts (location counts adjust based on filter)
     const [totalInstitutions, totalStates, totalDistricts, totalAreas] =
       await Promise.all([
-        Institution.countDocuments(),
-        State.countDocuments(),
-        District.countDocuments(),
-        Area.countDocuments(),
+        Institution.countDocuments(instFilter),
+        hasFilter ? (state ? 1 : Institution.distinct("state", instFilter).then(r => r.length)) : State.countDocuments(),
+        hasFilter
+          ? (district ? 1 : Institution.distinct("district", instFilter).then(r => r.length))
+          : District.countDocuments(),
+        hasFilter
+          ? (area ? 1 : Institution.distinct("area", instFilter).then(r => r.length))
+          : Area.countDocuments(),
       ]);
 
     // Count by type
     const typeStats = await Institution.aggregate([
+      ...(hasFilter ? [{ $match: instFilter }] : []),
       { $unwind: "$types" },
       { $group: { _id: "$types", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
@@ -27,14 +42,15 @@ exports.getDashboardStats = async (req, res, next) => {
 
     // Data coverage: has phone / email / contact / website
     const [withPhone, withEmail, withContact, withWebsite] = await Promise.all([
-      Institution.countDocuments({ phones: { $exists: true, $ne: [] } }),
-      Institution.countDocuments({ emails: { $exists: true, $ne: [] } }),
-      Institution.countDocuments({ contacts: { $exists: true, $ne: [] } }),
-      Institution.countDocuments({ website: { $exists: true, $ne: "" } }),
+      Institution.countDocuments({ ...instFilter, phones: { $exists: true, $ne: [] } }),
+      Institution.countDocuments({ ...instFilter, emails: { $exists: true, $ne: [] } }),
+      Institution.countDocuments({ ...instFilter, contacts: { $exists: true, $ne: [] } }),
+      Institution.countDocuments({ ...instFilter, website: { $exists: true, $ne: "" } }),
     ]);
 
     // Top 10 states by institution count
     const topStates = await Institution.aggregate([
+      ...(hasFilter ? [{ $match: instFilter }] : []),
       { $group: { _id: "$state", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
@@ -58,6 +74,7 @@ exports.getDashboardStats = async (req, res, next) => {
 
     // Top 10 districts by institution count
     const topDistricts = await Institution.aggregate([
+      ...(hasFilter ? [{ $match: instFilter }] : []),
       { $group: { _id: "$district", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 },
@@ -79,11 +96,36 @@ exports.getDashboardStats = async (req, res, next) => {
       },
     ]);
 
+    // Top 10 areas by institution count (useful when filtering by district/state)
+    const topAreas = await Institution.aggregate([
+      ...(hasFilter ? [{ $match: instFilter }] : []),
+      { $group: { _id: "$area", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: "areas",
+          localField: "_id",
+          foreignField: "_id",
+          as: "areaInfo",
+        },
+      },
+      { $unwind: "$areaInfo" },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          name: "$areaInfo.area",
+          pincode: "$areaInfo.pincode",
+        },
+      },
+    ]);
+
     // Recent 7 days activity (institutions added per day)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const recentActivity = await Institution.aggregate([
-      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      { $match: { ...instFilter, createdAt: { $gte: sevenDaysAgo } } },
       {
         $group: {
           _id: {
@@ -114,6 +156,7 @@ exports.getDashboardStats = async (req, res, next) => {
         },
         topStates,
         topDistricts,
+        topAreas,
         recentActivity,
       },
     });

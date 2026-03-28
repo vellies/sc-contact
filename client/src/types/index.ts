@@ -92,3 +92,64 @@ export interface CreateAreaDTO {
   city: string;
   district: string;
 }
+
+// MailerLite types
+export interface MailerLiteContact {
+  _id: string;
+  institution: string;
+  email: string;
+  phone: string;
+  contactName: string;
+  designation: string;
+  institutionName: string;
+  institutionType: "school" | "college" | "polytechnic" | "iti";
+  website: string;
+  address: string;
+  areaName: string;
+  pincode: string;
+  districtName: string;
+  stateName: string;
+  emailValid: boolean;
+  phoneValid: boolean;
+  isGenericEmail: boolean;
+  mailerliteId: string;
+  groupId: string;
+  status: "pending" | "added";
+  syncedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MailerLiteStats {
+  total: number;
+  validEmails: number;
+  invalidEmails: number;
+  genericEmails: number;
+  withPhone: number;
+  sendable: number;
+  statusBreakdown: {
+    pending: number;
+    added: number;
+  };
+  byType: { _id: string; count: number }[];
+  byState: { _id: string; count: number }[];
+  byDistrict: { _id: string; count: number }[];
+}
+
+export interface MailerLiteContactsResponse {
+  contacts: MailerLiteContact[];
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface MailerLiteGenerateResult {
+  institutionsProcessed: number;
+  contactsCreated: number;
+  contactsUpdated: number;
+  institutionsSkipped: number;
+  totalContacts: number;
+  uniqueEmails: number;
+  duplicates: number;
+}

@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/locations", label: "Locations" },
   { href: "/education", label: "Education" },
   { href: "/institutions", label: "Institutions" },
+  { href: "/mailerlite", label: "MailerLite" },
 ];
 
 export default function Navbar() {
