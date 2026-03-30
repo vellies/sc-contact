@@ -118,40 +118,35 @@ export default function MailerLitePage() {
     }
   };
 
-  // Export CSV
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await mailerLiteService.exportContacts();
-      const rows = res.data as MailerLiteContact[];
-
-      const headers = [
-        "Email", "Phone", "Contact Name", "Designation", "Institution",
-        "Type", "Website", "Address", "Area", "Pincode", "District", "State",
-      ];
-      const csvRows = [headers.join(",")];
-      for (const r of rows) {
-        csvRows.push(
-          [
-            r.email, r.phone, `"${r.contactName}"`, `"${r.designation}"`,
-            `"${r.institutionName}"`, r.institutionType, r.website,
-            `"${r.address}"`, `"${r.areaName}"`, r.pincode, r.districtName, r.stateName,
-          ].join(",")
-        );
-      }
-      const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `mailerlite-export-${Date.now()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`Exported ${rows.length} contacts`);
-    } catch {
-      toast.error("Export failed");
-    } finally {
-      setExporting(false);
+  // Export CSV — exports only the contacts currently visible on the page
+  const handleExport = () => {
+    if (contacts.length === 0) {
+      toast.error("No contacts to export");
+      return;
     }
+
+    const headers = [
+      "Email", "Phone", "Contact Name", "Designation", "Institution",
+      "Type", "Website", "Address", "Area", "Pincode", "District", "State",
+    ];
+    const csvRows = [headers.join(",")];
+    for (const r of contacts) {
+      csvRows.push(
+        [
+          r.email, r.phone, `"${r.contactName}"`, `"${r.designation}"`,
+          `"${r.institutionName}"`, r.institutionType, r.website,
+          `"${r.address}"`, `"${r.areaName}"`, r.pincode, r.districtName, r.stateName,
+        ].join(",")
+      );
+    }
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mailerlite-export-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${contacts.length} contacts`);
   };
 
   // Bulk update status

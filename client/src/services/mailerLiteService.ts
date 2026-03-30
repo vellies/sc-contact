@@ -51,7 +51,7 @@ export const mailerLiteService = {
     return res.data;
   },
 
-  async exportContacts(params: {
+  async exportContacts(params: ContactsParams & {
     onlyValid?: string;
     excludeGeneric?: string;
   } = {}) {

@@ -226,11 +226,35 @@ exports.bulkUpdateStatus = async (req, res, next) => {
 // @route   GET /api/mailerlite/export
 exports.exportContacts = async (req, res, next) => {
   try {
-    const { onlyValid = "true", excludeGeneric = "true" } = req.query;
+    const {
+      search,
+      status,
+      institutionType,
+      state,
+      district,
+      area,
+      emailValid,
+      isGenericEmail,
+    } = req.query;
 
     const filter = {};
-    if (onlyValid === "true") filter.emailValid = true;
-    if (excludeGeneric === "true") filter.isGenericEmail = false;
+
+    if (status) filter.status = status;
+    if (institutionType) filter.institutionType = institutionType;
+    if (state) filter.stateName = { $regex: state, $options: "i" };
+    if (district) filter.districtName = { $regex: district, $options: "i" };
+    if (area) filter.areaName = { $regex: area, $options: "i" };
+    if (emailValid !== undefined) filter.emailValid = emailValid === "true";
+    if (isGenericEmail !== undefined) filter.isGenericEmail = isGenericEmail === "true";
+
+    if (search) {
+      filter.$or = [
+        { email: { $regex: search, $options: "i" } },
+        { institutionName: { $regex: search, $options: "i" } },
+        { contactName: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ];
+    }
 
     const contacts = await MailerLiteContact.find(filter)
       .select(
