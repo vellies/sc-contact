@@ -385,6 +385,41 @@ exports.getAllInstitutions = async (req, res, next) => {
   }
 };
 
+// @desc    Lookup institution + mailerlite data by email
+// @route   GET /api/education/lookup-by-email
+exports.lookupByEmail = async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "email query param is required" });
+    }
+
+    const emailLower = email.toLowerCase().trim();
+
+    // Find institution(s) that have this email
+    const institutions = await Institution.find({ emails: emailLower })
+      .populate("area", "pincode area city")
+      .populate("district", "name")
+      .populate("state", "name code")
+      .lean();
+
+    // Find mailerlite contact with this email
+    const MailerLiteContact = require("../models/MailerLiteContact");
+    const mailerLiteContact = await MailerLiteContact.findOne({ email: emailLower }).lean();
+
+    res.json({
+      success: true,
+      data: {
+        email: emailLower,
+        institutions,
+        mailerLiteContact,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ==================== SAVE / GET FROM DB ====================
 
 // @desc    Save search results to DB for an area

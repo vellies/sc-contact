@@ -84,6 +84,10 @@ exports.getStats = async (req, res, next) => {
       withPhone,
       pending,
       added,
+      valid,
+      emailStatus,
+      clicked,
+      demo,
     ] = await Promise.all([
       MailerLiteContact.countDocuments(),
       MailerLiteContact.countDocuments({ emailValid: true }),
@@ -92,6 +96,10 @@ exports.getStats = async (req, res, next) => {
       MailerLiteContact.countDocuments({ phoneValid: true }),
       MailerLiteContact.countDocuments({ status: "pending" }),
       MailerLiteContact.countDocuments({ status: "added" }),
+      MailerLiteContact.countDocuments({ status: "valid" }),
+      MailerLiteContact.countDocuments({ status: "email" }),
+      MailerLiteContact.countDocuments({ status: "clicked" }),
+      MailerLiteContact.countDocuments({ status: "demo" }),
     ]);
 
     // By institution type
@@ -131,7 +139,7 @@ exports.getStats = async (req, res, next) => {
         genericEmails,
         withPhone,
         sendable,
-        statusBreakdown: { pending, added },
+        statusBreakdown: { pending, added, valid, email: emailStatus, clicked, demo },
         byType,
         byState,
         byDistrict,
@@ -199,7 +207,7 @@ exports.bulkUpdateStatus = async (req, res, next) => {
   try {
     const { ids, status } = req.body;
 
-    const validStatuses = ["pending", "added"];
+    const validStatuses = ["pending", "added", "valid", "email", "clicked", "demo"];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status" });
     }

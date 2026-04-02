@@ -114,7 +114,7 @@ export interface MailerLiteContact {
   isGenericEmail: boolean;
   mailerliteId: string;
   groupId: string;
-  status: "pending" | "added";
+  status: "pending" | "added" | "valid" | "email" | "clicked" | "demo";
   syncedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -130,6 +130,10 @@ export interface MailerLiteStats {
   statusBreakdown: {
     pending: number;
     added: number;
+    valid: number;
+    email: number;
+    clicked: number;
+    demo: number;
   };
   byType: { _id: string; count: number }[];
   byState: { _id: string; count: number }[];

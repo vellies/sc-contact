@@ -93,7 +93,7 @@ const mailerLiteContactSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "added"],
+      enum: ["pending", "added", "valid", "email", "clicked", "demo"],
       default: "pending",
     },
     syncedAt: {

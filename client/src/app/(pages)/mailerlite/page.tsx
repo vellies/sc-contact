@@ -10,11 +10,15 @@ import type {
 } from "@/types";
 import toast from "react-hot-toast";
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 250, 500, 750, 1000] as const;
+const PAGE_SIZE_OPTIONS = [2, 5, 10, 20, 50, 100, 250, 500, 750, 1000] as const;
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   added: "bg-green-100 text-green-700",
+  valid: "bg-blue-100 text-blue-700",
+  email: "bg-purple-100 text-purple-700",
+  clicked: "bg-indigo-100 text-indigo-700",
+  demo: "bg-pink-100 text-pink-700",
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -23,6 +27,8 @@ const TYPE_COLORS: Record<string, string> = {
   polytechnic: "bg-orange-100 text-orange-700",
   iti: "bg-yellow-100 text-yellow-700",
 };
+
+const formatType = (t: string) => t === "iti" ? "ITI" : t.charAt(0).toUpperCase() + t.slice(1);
 
 export default function MailerLitePage() {
   // Stats
@@ -134,7 +140,7 @@ export default function MailerLitePage() {
       csvRows.push(
         [
           r.email, r.phone, `"${r.contactName}"`, `"${r.designation}"`,
-          `"${r.institutionName}"`, r.institutionType, r.website,
+          `"${r.institutionName}"`, formatType(r.institutionType), r.website,
           `"${r.address}"`, `"${r.areaName}"`, r.pincode, r.districtName, r.stateName,
         ].join(",")
       );
@@ -275,6 +281,10 @@ export default function MailerLitePage() {
                     { label: "Generic Emails", value: stats.genericEmails, color: "text-orange-600" },
                     { label: "Pending", value: stats.statusBreakdown.pending, color: "text-yellow-600" },
                     { label: "Added", value: stats.statusBreakdown.added, color: "text-green-600" },
+                    { label: "Valid", value: stats.statusBreakdown.valid, color: "text-blue-600" },
+                    { label: "Email", value: stats.statusBreakdown.email, color: "text-purple-600" },
+                    { label: "Clicked", value: stats.statusBreakdown.clicked, color: "text-indigo-600" },
+                    { label: "Demo", value: stats.statusBreakdown.demo, color: "text-pink-600" },
                   ].map((c) => (
                     <div key={c.label} className="bg-white border rounded-xl p-5 shadow-sm">
                       <span className="text-sm font-medium text-gray-500">{c.label}</span>
@@ -305,7 +315,7 @@ export default function MailerLitePage() {
                       {stats.byType.map((t) => (
                         <div key={t._id} className="flex items-center justify-between">
                           <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${TYPE_COLORS[t._id] || "bg-gray-100"}`}>
-                            {t._id}
+                            {formatType(t._id)}
                           </span>
                           <span className="text-sm font-semibold">{t.count.toLocaleString()}</span>
                         </div>
@@ -394,6 +404,10 @@ export default function MailerLitePage() {
                   <option value="">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="added">Added</option>
+                  <option value="valid">Valid</option>
+                  <option value="email">Email</option>
+                  <option value="clicked">Clicked</option>
+                  <option value="demo">Demo</option>
                 </select>
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
                   className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
@@ -523,7 +537,7 @@ export default function MailerLitePage() {
                           </td>
                           <td className="px-3 py-2.5">
                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${TYPE_COLORS[c.institutionType] || ""}`}>
-                              {c.institutionType}
+                              {formatType(c.institutionType)}
                             </span>
                           </td>
                           <td className="px-3 py-2.5">
@@ -566,6 +580,10 @@ export default function MailerLitePage() {
                             >
                               <option value="pending">pending</option>
                               <option value="added">added</option>
+                              <option value="valid">valid</option>
+                              <option value="email">email</option>
+                              <option value="clicked">clicked</option>
+                              <option value="demo">demo</option>
                             </select>
                           </td>
                         </tr>
@@ -660,7 +678,7 @@ export default function MailerLitePage() {
             </p>
 
             <div className="space-y-3 mb-6">
-              {(["pending", "added"] as const).map((s) => (
+              {(["pending", "added", "valid", "email", "clicked", "demo"] as const).map((s) => (
                 <label
                   key={s}
                   className={`flex items-center gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-colors ${

@@ -15,6 +15,7 @@ const {
   scrapeByArea,
   getAllInstitutions,
   getDashboardStats,
+  lookupByEmail,
 } = require("../controllers/educationController");
 const {
   validateSaveInstitutions,
@@ -33,6 +34,7 @@ router.post("/save", validateSaveInstitutions, saveInstitutions);
 router.get("/dashboard", getDashboardStats);
 
 // --- Get from DB ---
+router.get("/lookup-by-email", lookupByEmail);
 router.get("/all", getAllInstitutions);
 router.get("/area/:areaId", getByArea);
 router.get("/district/:districtId", getByDistrict);
