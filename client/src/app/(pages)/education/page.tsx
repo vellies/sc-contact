@@ -570,7 +570,7 @@ export default function EducationPage() {
                 </div>
                 <div className="flex items-end">
                   <button onClick={handleDropdownSearch} disabled={searching || !selectedArea} className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    {searching ? "Searching..." : "Search & Auto-Save"}
+                    {searching ? "Getting..." : "Get From Google API"}
                   </button>
                 </div>
               </div>
