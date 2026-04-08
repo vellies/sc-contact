@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import api from "@/lib/axios";
-import type { MailerLiteContact } from "@/types";
+import { gLeadsService } from "@/services/gLeadsService";
+import type { MailerLiteContact, GLeadsContact } from "@/types";
 
 interface InstitutionData {
   _id: string;
@@ -46,6 +47,30 @@ const Badge = ({ color, children }: { color: string; children: React.ReactNode }
   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${color}`}>{children}</span>
 );
 
+const STATUS_COLORS: Record<string, string> = {
+  pending:   "bg-yellow-100 text-yellow-700",
+  contacted: "bg-blue-100 text-blue-700",
+  replied:   "bg-indigo-100 text-indigo-700",
+  demo:      "bg-pink-100 text-pink-700",
+  closed:    "bg-green-100 text-green-700",
+  invalid:   "bg-red-100 text-red-700",
+};
+
+const STATUSES = ["pending", "contacted", "replied", "demo", "closed", "invalid"] as const;
+
+function extractPhones(phoneNumbers: GLeadsContact["phoneNumbers"]): string[] {
+  let data: unknown = phoneNumbers;
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch { return data ? [data as string] : []; }
+  }
+  if (Array.isArray(data)) {
+    return (data as Array<{ sanitized_number?: string; raw_number?: string }>)
+      .map((p) => (p.sanitized_number || p.raw_number || "").trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export default function ViewInstitutePage() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
@@ -53,6 +78,10 @@ export default function ViewInstitutePage() {
   const [data, setData] = useState<LookupResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [glead, setGlead]           = useState<GLeadsContact | null>(null);
+  const [gleadLoading, setGleadLoading] = useState(false);
+  const [gleadSaving, setGleadSaving]   = useState(false);
 
   useEffect(() => {
     if (!email) return;
@@ -62,7 +91,26 @@ export default function ViewInstitutePage() {
       .then((res) => setData(res.data.data))
       .catch(() => setError("Failed to load data"))
       .finally(() => setLoading(false));
+
+    setGleadLoading(true);
+    gLeadsService.getByEmail(email)
+      .then(setGlead)
+      .catch(() => setGlead(null))
+      .finally(() => setGleadLoading(false));
   }, [email]);
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!glead) return;
+    setGleadSaving(true);
+    try {
+      const updated = await gLeadsService.updateStatus(glead.email, newStatus);
+      setGlead(updated);
+    } catch {
+      // silent
+    } finally {
+      setGleadSaving(false);
+    }
+  };
 
   return (
     <ProtectedRoute>
@@ -202,6 +250,8 @@ export default function ViewInstitutePage() {
                 </div>
               </div>
             )}
+
+          
 
             {/* MailerLite Contact Section */}
             <div>

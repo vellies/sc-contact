@@ -11,6 +11,7 @@ const navLinks = [
   { href: "/education", label: "Education" },
   { href: "/institutions", label: "Institutions" },
   { href: "/mailerlite", label: "MailerLite" },
+  { href: "/gleads",     label: "gLeads" },
 ];
 
 export default function Navbar() {

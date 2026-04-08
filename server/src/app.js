@@ -10,6 +10,7 @@ const authRoutes = require("./routes/authRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const educationRoutes = require("./routes/educationRoutes");
 const mailerLiteRoutes = require("./routes/mailerLiteRoutes");
+const gLeadsRoutes     = require("./routes/gLeadsRoutes");
 const { errorHandler, notFound } = require("./middlewares/errorHandler");
 
 const app = express();
@@ -23,7 +24,8 @@ app.use(
   })
 );
 app.use(morgan("dev"));
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting
@@ -44,6 +46,7 @@ app.use("/api/contacts", contactRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/education", educationRoutes);
 app.use("/api/mailerlite", mailerLiteRoutes);
+app.use("/api/gleads",    gLeadsRoutes);
 
 // --------------- Error Handling ---------------
 app.use(notFound);

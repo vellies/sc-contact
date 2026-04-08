@@ -148,6 +148,50 @@ export interface MailerLiteContactsResponse {
   totalPages: number;
 }
 
+// GLeads types
+export interface GLeadsContact {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumbers: Array<{ sanitized_number?: string; raw_number?: string; type?: string }> | Record<string, string>;
+  linkedinUrl: string;
+  title: string;
+  headline: string;
+  state: string;
+  city: string;
+  country: string;
+  status: "pending" | "contacted" | "replied" | "demo" | "closed" | "invalid";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GLeadsStats {
+  total: number;
+  withPhone: number;
+  withLinkedin: number;
+  statusBreakdown: {
+    pending: number;
+    contacted: number;
+    replied: number;
+    demo: number;
+    closed: number;
+    invalid: number;
+  };
+  byCountry: { _id: string; count: number }[];
+  byState:   { _id: string; count: number }[];
+  byCity:    { _id: string; count: number }[];
+  byTitle:   { _id: string; count: number }[];
+}
+
+export interface GLeadsContactsResponse {
+  contacts:   GLeadsContact[];
+  page:       number;
+  limit:      number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface MailerLiteGenerateResult {
   institutionsProcessed: number;
   contactsCreated: number;
