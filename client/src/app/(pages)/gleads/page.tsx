@@ -7,7 +7,7 @@ import { gLeadsService } from "@/services/gLeadsService";
 import type { GLeadsContact, GLeadsStats, GLeadsContactsResponse } from "@/types";
 import toast from "react-hot-toast";
 
-const PAGE_SIZE_OPTIONS = [2,5,10, 20, 50, 100, 250, 500, 750, 1000] as const;
+const PAGE_SIZE_OPTIONS = [2,5,10, 20, 50, 100, 250, 500, 750, 1000,2000,5000,7500,10000] as const;
 
 function Pager({
   page, totalPages, totalCount, perPage, loading,

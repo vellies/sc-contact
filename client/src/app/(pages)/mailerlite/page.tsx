@@ -209,10 +209,17 @@ export default function MailerLitePage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold">MailerLite Contacts</h1>
+            <h1 className="text-3xl font-bold">Scrape Contacts</h1>
             <p className="text-sm text-gray-500 mt-1">Cleaned & validated contacts for email marketing</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => { loadStats(); loadContacts(); }}
+              disabled={statsLoading || tableLoading}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            >
+              Refresh
+            </button>
             <button
               onClick={handleGenerate}
               disabled={generating}
