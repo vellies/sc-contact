@@ -9,6 +9,7 @@ const contactRoutes = require("./routes/contactRoutes");
 const authRoutes = require("./routes/authRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const educationRoutes = require("./routes/educationRoutes");
+const coachingRoutes  = require("./routes/coachingRoutes");
 const mailerLiteRoutes = require("./routes/mailerLiteRoutes");
 const gLeadsRoutes     = require("./routes/gLeadsRoutes");
 const { errorHandler, notFound } = require("./middlewares/errorHandler");
@@ -45,6 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/education", educationRoutes);
+app.use("/api/coaching",  coachingRoutes);
 app.use("/api/mailerlite", mailerLiteRoutes);
 app.use("/api/gleads",    gLeadsRoutes);
 
