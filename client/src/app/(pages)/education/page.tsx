@@ -16,6 +16,9 @@ import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import type { StateType, DistrictType, AreaType } from "@/types";
 
+// Delay utility for rate limiting
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // ========== ZOD SCHEMA ==========
 const institutionFormSchema = z.object({
   name: z
@@ -76,20 +79,22 @@ export default function EducationPage() {
   const [areas, setAreas] = useState<AreaType[]>([]);
   const [selectedState, setSelectedState] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedArea, setSelectedArea] = useState("");
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]); // MULTI-SELECT support
 
   // Manual search
   const [manualPincode, setManualPincode] = useState("");
   const [manualArea, setManualArea] = useState("");
   const [manualCity, setManualCity] = useState("");
 
-  // Mode
+  // Mode & UI States
   const [searchMode, setSearchMode] = useState<"dropdown" | "manual">("dropdown");
   const [viewMode, setViewMode] = useState<ViewMode>("search");
+  const [areaSelectOpen, setAreaSelectOpen] = useState(false);
 
   // Search results
   const [results, setResults] = useState<EducationInstitution[]>([]);
   const [searching, setSearching] = useState(false);
+  const [progressText, setProgressText] = useState(""); // Progress tracking
   const [searchInfo, setSearchInfo] = useState("");
 
   // Saved data
@@ -176,7 +181,7 @@ export default function EducationPage() {
   const handleStateChange = async (stateId: string) => {
     setSelectedState(stateId);
     setSelectedDistrict("");
-    setSelectedArea("");
+    setSelectedAreas([]);
     setDistricts([]);
     setAreas([]);
     clearResults();
@@ -191,7 +196,7 @@ export default function EducationPage() {
 
   const handleDistrictChange = async (districtId: string) => {
     setSelectedDistrict(districtId);
-    setSelectedArea("");
+    setSelectedAreas([]);
     setAreas([]);
     clearResults();
     if (!districtId) return;
@@ -203,21 +208,23 @@ export default function EducationPage() {
     }
   };
 
-  // Clear results + check saved count when area changes
+  // Clear results + check saved count when first area changes
   useEffect(() => {
     setResults([]);
     setSavedData([]);
     setSearchInfo("");
     setViewMode("search");
-    if (!selectedArea) { setSavedCount(null); return; }
+    if (selectedAreas.length === 0) { setSavedCount(null); return; }
+    
+    // We only check the primary/first selected area for quick stat display
     const check = async () => {
       try {
-        const res = await educationService.getByArea(selectedArea);
+        const res = await educationService.getByArea(selectedAreas[0]);
         setSavedCount(res.count);
       } catch { setSavedCount(0); }
     };
     check();
-  }, [selectedArea]);
+  }, [selectedAreas]);
 
   // ========== AUTO-SAVE ==========
   const autoSave = async (areaId: string, institutions: EducationInstitution[]) => {
@@ -234,56 +241,152 @@ export default function EducationPage() {
 
   // ========== SEARCH ==========
   const handleDropdownSearch = async () => {
-    if (!selectedArea) { toast.error("Please select an area first"); return; }
+    if (selectedAreas.length === 0) { toast.error("Please select at least one area"); return; }
     setSearching(true);
     setResults([]);
     setViewMode("search");
+    
+    let totalResults: EducationInstitution[] = [];
+    
     try {
-      const res = await educationService.searchByArea(selectedArea);
-      setResults(res.data);
-      setSearchInfo(`${res.query.area}, ${res.query.city} - ${res.query.pincode} (${res.query.district}, ${res.query.state})`);
-      if (res.count === 0) {
-        toast("No institutions found", { icon: "ℹ️" });
+      for (let index = 0; index < selectedAreas.length; index++) {
+        const currentAreaId = selectedAreas[index];
+        setProgressText(`Processing area ${index + 1} of ${selectedAreas.length}...`);
+        
+        const res = await educationService.searchByArea(currentAreaId);
+        totalResults = [...totalResults, ...res.data];
+        setSearchInfo(`${res.query.area}, ${res.query.city} - ${res.query.pincode} (${res.query.district}, ${res.query.state})`);
+        
+        if (res.count > 0) {
+          setProgressText(`Auto-saving ${res.count} institutions for area ${res.query.area}...`);
+          await autoSave(currentAreaId, res.data);
+          
+          // Fetch the newly saved ones to get their DB _id for scraping
+          setProgressText(`Getting DB records to start scraping for ${res.query.area}...`);
+          const savedRes = await educationService.getByArea(currentAreaId);
+          
+          // Filter to only items with websites
+          const itemsToScrape = savedRes.data.filter(i => !!i.website);
+          
+          for (let i = 0; i < itemsToScrape.length; i++) {
+            const target = itemsToScrape[i];
+            setProgressText(`Area: ${res.query.area} | Scraping website ${i + 1} of ${itemsToScrape.length}`);
+            setScrapingId(target._id);
+            try {
+              await educationService.scrapeInstitution(target._id);
+              // Wait 2.5 seconds between scrapes to avoid backend/target server rate-limits
+              if (i < itemsToScrape.length - 1) {
+                setProgressText(`Area: ${res.query.area} | Cooling down before next scrape...`);
+                await delay(2500);
+              }
+            } catch (err) {
+              console.error(`Scrape failed for ${target.name}`, err);
+            }
+          }
+          setScrapingId(null);
+        }
+        
+        // Wait 3 seconds between Area searches to avoid Google API 429 Too Many Requests
+        if (index < selectedAreas.length - 1) {
+          setProgressText(`Cooling down before searching next area...`);
+          await delay(3000);
+        }
+      }
+      setResults(totalResults);
+      if (totalResults.length > 0) {
+        toast.success(`Search & Scrape completed! Found ${totalResults.length} total institutions.`);
       } else {
-        toast.success(`Found ${res.count} institutions`);
-        await autoSave(selectedArea, res.data);
+        toast("No institutions found", { icon: "ℹ️" });
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Search failed");
+      toast.error(err.response?.data?.message || "Search sequence failed");
     } finally {
       setSearching(false);
+      setProgressText("");
     }
   };
 
   const handleManualSearch = async () => {
     if (!manualPincode || !manualArea) { toast.error("Pincode and area are required"); return; }
+    
+    // Support multiple pincodes via comma separate
+    const pincodesToProcess = manualPincode.split(",").map(p => p.replace(/\D/g, "").trim()).filter(p => p.length >= 6);
+    if (pincodesToProcess.length === 0) { toast.error("Please provide valid 6-digit pincode(s)"); return; }
+    
     setSearching(true);
     setResults([]);
     setViewMode("search");
+    
+    let totalResults: EducationInstitution[] = [];
+
     try {
-      const res = await educationService.search({ pincode: manualPincode, area: manualArea, city: manualCity || undefined });
-      setResults(res.data);
-      setSearchInfo(`${manualArea}, ${manualCity || ""} - ${manualPincode}`);
-      if (res.count === 0) {
-        toast("No institutions found", { icon: "ℹ️" });
+      for (let idx = 0; idx < pincodesToProcess.length; idx++) {
+        const pcode = pincodesToProcess[idx];
+        setProgressText(`Searching pincode ${pcode} (${idx + 1} of ${pincodesToProcess.length})...`);
+        
+        const res = await educationService.search({ pincode: pcode, area: manualArea, city: manualCity || undefined });
+        totalResults = [...totalResults, ...res.data];
+        setSearchInfo(`Searched: ${manualArea}, ${manualCity || ""} - Pincodes: ${pincodesToProcess.join(", ")}`);
+        
+        if (res.count > 0 && selectedAreas.length > 0) {
+          const areaForSave = selectedAreas[0];
+          setProgressText(`Auto-saving results for pincode ${pcode}...`);
+          await autoSave(areaForSave, res.data);
+          
+          setProgressText(`Fetching DB records for scraping...`);
+          const savedRes = await educationService.getByArea(areaForSave);
+          // To be safe, try to match by name or just scrape all that have websites locally.
+          const itemsToScrape = savedRes.data.filter(i => !!i.website);
+          
+          for (let i = 0; i < itemsToScrape.length; i++) {
+            const target = itemsToScrape[i];
+            setProgressText(`Pincode: ${pcode} | Scraping website ${i + 1} of ${itemsToScrape.length}`);
+            setScrapingId(target._id);
+            try {
+              await educationService.scrapeInstitution(target._id);
+              // Wait 2.5 seconds between scrapes to avoid rate-limiting
+              if (i < itemsToScrape.length - 1) {
+                setProgressText(`Pincode: ${pcode} | Cooling down before next scrape...`);
+                await delay(2500);
+              }
+            } catch (err) {
+              console.error(`Scrape faield for ${target.name}`, err);
+            }
+          }
+          setScrapingId(null);
+        }
+        
+        // Wait 3 seconds between Pincode searches to avoid Google API 429
+        if (idx < pincodesToProcess.length - 1) {
+          setProgressText(`Cooling down before searching next pincode...`);
+          await delay(3000);
+        }
+      }
+      setResults(totalResults);
+      if (totalResults.length > 0) {
+        if (selectedAreas.length === 0) {
+          toast.success(`Found ${totalResults.length} total institutions. (Not saved/scraped because no area was selected in dropdown)`);
+        } else {
+          toast.success(`Found ${totalResults.length} total institutions. Auto-saved & Scraped!`);
+        }
       } else {
-        toast.success(`Found ${res.count} institutions`);
-        if (selectedArea) await autoSave(selectedArea, res.data);
+        toast("No institutions found", { icon: "ℹ️" });
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Search failed");
+      toast.error(err.response?.data?.message || "Search sequence failed");
     } finally {
       setSearching(false);
+      setProgressText("");
     }
   };
 
   // ========== LOAD SAVED ==========
   const handleLoadSaved = async () => {
-    if (!selectedArea) { toast.error("Select an area first"); return; }
+    if (selectedAreas.length === 0) { toast.error("Select an area first"); return; }
     setSavedLoading(true);
     setViewMode("saved");
     try {
-      const res = await educationService.getByArea(selectedArea);
+      const res = await educationService.getByArea(selectedAreas[0]);
       setSavedData(res.data);
       setSavedCount(res.count);
     } catch {
@@ -347,10 +450,10 @@ export default function EducationPage() {
   };
 
   const handleDeleteAll = async () => {
-    if (!selectedArea) return;
+    if (selectedAreas.length === 0) return;
     setDeletingAll(true);
     try {
-      const res = await educationService.deleteAllByArea(selectedArea);
+      const res = await educationService.deleteAllByArea(selectedAreas[0]);
       toast.success(`Deleted ${res.deletedCount} institutions`);
       setShowDeleteAll(false);
       setSavedData([]);
@@ -387,10 +490,11 @@ export default function EducationPage() {
 
   // ========== SCRAPE ALL ==========
   const handleScrapeAll = async () => {
-    if (!selectedArea) return;
+    if (selectedAreas.length === 0) return;
     setScrapingAll(true);
     try {
-      const res = await educationService.scrapeAllByArea(selectedArea);
+      // For Scrape All button we just trigger backend bulk or we can also loop. Let's do backend bulk for manual clicks if desired.
+      const res = await educationService.scrapeAllByArea(selectedAreas[0]);
       toast.success(res.message, { duration: 5000 });
       handleLoadSaved();
     } catch (err: any) {
@@ -561,24 +665,74 @@ export default function EducationPage() {
                     {districts.map((d) => (<option key={d._id} value={d._id}>{d.name}</option>))}
                   </select>
                 </div>
-                <div>
+                {/* Custom Multi-Select for Area */}
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Area / Pincode</label>
-                  <select value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)} disabled={!selectedDistrict} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50">
-                    <option value="">Select Area</option>
-                    {areas.map((a) => (<option key={a._id} value={a._id}>{a.pincode} - {a.area}</option>))}
-                  </select>
+                  <button
+                    type="button"
+                    disabled={!selectedDistrict}
+                    onClick={() => setAreaSelectOpen(!areaSelectOpen)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 text-left bg-white flex items-center justify-between shadow-sm"
+                  >
+                    <span className="truncate">
+                      {selectedAreas.length === 0 ? "Select Area(s)" : `${selectedAreas.length} area(s) selected`}
+                    </span>
+                    <span className="ml-2 text-gray-400 text-xs">▼</span>
+                  </button>
+
+                  {areaSelectOpen && selectedDistrict && (
+                    <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      <div className="p-2 border-b flex justify-between items-center bg-gray-50 sticky top-0 z-10">
+                        <span className="text-xs font-semibold text-gray-600">Select Multiple</span>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (selectedAreas.length === areas.length && areas.length > 0) setSelectedAreas([]);
+                            else setSelectedAreas(areas.map(a => a._id));
+                          }} 
+                          className="text-xs text-blue-600 hover:underline font-medium"
+                        >
+                          {selectedAreas.length === areas.length && areas.length > 0 ? "Deselect All" : "Select All"}
+                        </button>
+                      </div>
+                      {areas.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500 text-center">No areas available</div>
+                      ) : (
+                        areas.map((a) => (
+                          <label key={a._id} className="flex items-center px-3 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={selectedAreas.includes(a._id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedAreas([...selectedAreas, a._id]);
+                                else setSelectedAreas(selectedAreas.filter(id => id !== a._id));
+                              }}
+                              className="mr-3 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{a.pincode} - {a.area}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  {/* Invisible backdrop to close the dropdown */}
+                  {areaSelectOpen && (
+                    <div className="fixed inset-0 z-10" onClick={() => setAreaSelectOpen(false)} />
+                  )}
                 </div>
+                
                 <div className="flex items-end">
-                  <button onClick={handleDropdownSearch} disabled={searching || !selectedArea} className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    {searching ? "Getting..." : "Get From Google API"}
+                  <button onClick={() => { setAreaSelectOpen(false); handleDropdownSearch(); }} disabled={searching || selectedAreas.length === 0} className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm relative z-0">
+                    {searching ? "Processing..." : "Get From Google API"}
                   </button>
                 </div>
               </div>
-              {selectedArea && savedCount !== null && (
+              {selectedAreas.length > 0 && savedCount !== null && (
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className={`w-2.5 h-2.5 rounded-full ${savedCount > 0 ? "bg-green-500" : "bg-gray-300"}`} />
                   <span className="text-sm text-gray-600">
-                    {savedCount > 0 ? <><strong>{savedCount}</strong> institutions saved in database</> : "No saved data for this area"}
+                    {savedCount > 0 ? <><strong>{savedCount}</strong> institutions saved in Primary Area</> : "No saved data for area"}
                   </span>
                   {savedCount > 0 && (
                     <button onClick={handleLoadSaved} className="px-3 py-1 text-xs bg-white border rounded-lg hover:bg-gray-100 transition-colors font-medium text-blue-600">View Saved Data</button>
@@ -589,8 +743,9 @@ export default function EducationPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
-                <input type="text" value={manualPincode} onChange={(e) => setManualPincode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="e.g. 641001" className="w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pincode(s) *</label>
+                <input type="text" value={manualPincode} onChange={(e) => setManualPincode(e.target.value)} placeholder="e.g. 641001, 641002" className="w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                <p className="text-[10px] text-gray-500 mt-1">Comma separated for multiple</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Area *</label>
@@ -600,7 +755,7 @@ export default function EducationPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input type="text" value={manualCity} onChange={(e) => setManualCity(e.target.value)} placeholder="e.g. Coimbatore" className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end h-[62px]">
                 <button onClick={handleManualSearch} disabled={searching || !manualPincode || !manualArea} className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {searching ? "Searching..." : "Search"}
                 </button>
@@ -613,7 +768,8 @@ export default function EducationPage() {
         {(searching || savedLoading) && (
           <div className="bg-white border rounded-xl p-12 shadow-sm text-center">
             <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-gray-500">{searching ? "Searching Google Places API... 10-30 seconds." : "Loading saved data..."}</p>
+            <p className="text-gray-500 font-medium">{progressText || (searching ? "Searching Google Places API..." : "Loading saved data...")}</p>
+            {searching && <p className="text-xs text-blue-500 mt-2">Do not close this page until completed.</p>}
           </div>
         )}
 
@@ -629,7 +785,7 @@ export default function EducationPage() {
                 {searchInfo && <p className="text-xs text-gray-500 mt-0.5">{searchInfo}</p>}
               </div>
               <div className="flex gap-2">
-                {selectedArea && savedCount !== null && savedCount > 0 && (
+                {selectedAreas.length > 0 && savedCount !== null && savedCount > 0 && (
                   <button onClick={handleLoadSaved} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 transition-colors font-medium">View Saved ({savedCount})</button>
                 )}
                 <button onClick={() => exportCSV(results)} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">Export CSV</button>
